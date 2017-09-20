@@ -1,0 +1,280 @@
+%% Data import and Cleanup
+clear all
+dat = importdata('CalTech_F35216MW_200-540-13_70.0 kPa_Slip Angle Sweep_1605917.xlsm');
+
+data = dat.data.Sheet1;
+idx = all(isnan(data),2);
+idr = diff(find([1;diff(idx);1]));
+D = mat2cell(data,idr(:),size(data,2));
+D(2:2:end)=[]
+
+%% Making a structured array
+tire_data = struct('B1', D(1),'B2', D(2),'B3', D(3),'B4', D(4), 'B5', D(5),'B6', D(6))
+
+%% Finding K (Coefficient of Lateral Friction)
+klArray = []
+average = []
+ind = []
+for i = 1:12
+    k = cell2mat(D(i));
+    
+    % Data doesnt come in one swoop through the -8 to 8 degree range
+    % We need to clean it up to extract that part of the data
+    % that does go from -8 to 8.
+
+    [pks, locs] = findpeaks(abs(k(:,2)));
+    k(1:(locs(1)),:) = [];
+    k((locs(2)-locs(1)):end,:) = [];
+    
+
+    % Now that the data is cleaned up we can plot the data 
+    % First we need to divide each lateral force data point by its
+    % corresponding normal force. Then we fit a curve to this data.
+
+    x1 = -8:0.05:8;
+    x2 = k(:,2);        %Dont really need an extra variable but meh...
+    x3 = unique(x2);    %Get rid of repetitions
+    
+    lat_force = k(:,7); 
+    norm_force = k(:,8);
+    
+    %If there are repetitions find the intersection between x2 and x3 and tell 
+    %me which data points these are.
+                                
+    [diff, index] = intersect(x2, x3, 'rows'); 
+    
+    total_force = (lat_force(index).^2+k(index,6).^2).^(0.5);
+    
+    for f = 1:length(index)
+        if (lat_force(index(f)) ~= abs(lat_force(index(f))))
+            total_force(f) = -total_force(f);
+        end
+    end
+    
+    %Fit the spline
+
+    % pc = spline(x3, -lat_force(index)./abs(norm_force(index)), x1);
+    pc = csaps(x2,lat_force./-norm_force, 0.9 ,x1);
+    %Find the peaks and their indices in the array. Put these into an array
+    %of Kl values
+    
+    [pks2, locs2] =max(abs(pc));
+    klArray = cat(2, klArray, pks2(1)); 
+    
+    %Plot these values 
+  
+    
+    if (i ~= 12)
+       hold on
+    end 
+    
+    % Dont worry about this for now 
+
+    if (i == 1 || i == 2 || i == 3 || i == 4)
+        ind = cat(2, ind, klArray(i))
+        plot(x1, -pc)
+        xlabel('Slip Angle'); ylabel('Lateral Force'); 
+    end
+end
+legend('Camber = 0', 'Camber = -1.5', 'Camber = -3.0', 'Camber = -4.5')
+savefig('CamberVariation.fig')
+figure();
+poly = csaps([-4.5, -3.0, -1.5, 0], transpose(ind), 0.95, [-5.0:0.05:0]);
+plot([0:-0.05:-5.0], poly);
+xlabel('Camber (deg)'); ylabel('Max Lateral Force(N)');
+savefig('CamberPeaks')
+
+%% Finding K (Coefficient of Lateral Friction)
+angle_array = []
+average = []
+ind = []
+for i = 1:12
+    k = cell2mat(D(i));
+    
+    % Data doesnt come in one swoop through the -8 to 8 degree range
+    % We need to clean it up to extract that part of the data
+    % that does go from -8 to 8.
+
+    [pks, locs] = findpeaks(abs(k(:,2)));
+    k(1:(locs(1)),:) = [];
+    k((locs(2)-locs(1)):end,:) = [];
+    
+
+    % Now that the data is cleaned up we can plot the data 
+    % First we need to divide each lateral force data point by its
+    % corresponding normal force. Then we fit a curve to this data.
+
+    x1 = -8:0.05:8;
+    x2 = k(:,2);        %Dont really need an extra variable but meh...
+    x3 = unique(x2);    %Get rid of repetitions
+    
+    lat_force = k(:,7); 
+    norm_force = k(:,8);
+    
+    %If there are repetitions find the intersection between x2 and x3 and tell 
+    %me which data points these are.
+                                
+    [diff, index] = intersect(x2, x3, 'rows'); 
+    
+    total_force = (lat_force(index).^2+k(index,6).^2).^(0.5);
+    
+    for f = 1:length(index)
+        if (lat_force(index(f)) ~= abs(lat_force(index(f))))
+            total_force(f) = -total_force(f);
+        end
+    end
+    
+    %Fit the spline
+
+    % pc = spline(x3, -lat_force(index)./abs(norm_force(index)), x1);
+    pc = csaps(x2,lat_force./norm_force, 0.9 ,x1);
+    %Find the peaks and their indices in the array. Put these into an array
+    %of Kl values
+    
+    [pks2, locs2] =max(abs(pc));
+    if (i == 1 || i == 5 | i == 9)
+        angle_array = cat(2, angle_array, x1(locs2))
+    end 
+    
+    %Plot these values 
+  
+    
+    if (i ~= 12)
+       hold on
+    end 
+    
+    % Dont worry about this for now 
+
+    if (i == 9)
+        poly = csaps([150; 200; 250], angle_array, 0.95, [10:0.5:800]);
+        plot([10:0.5:800], poly)
+    end
+    xlabel('Load'); ylabel('Max Lat Force Slip Angle'); 
+    savefig('SAvsPeaks.fig')
+end
+
+%% Data import and Cleanup
+clear all
+dat = importdata('CalTech_F35216MW_200-540-13_70.0 kPa_Drive-Brake_1603974.xlsm');
+
+data = dat.data.Sheet1;
+idx = all(isnan(data),2);
+idr = diff(find([1;diff(idx);1]));
+D = mat2cell(data,idr(:),size(data,2));
+D(2:2:end)=[]
+
+%% Finding K (Coefficient of Longitudinal Friction)
+clear all;
+klArray = []
+average = []
+ind = []
+for i = 1:3
+    k = cell2mat(D(i));
+    
+    % Data doesnt come in one swoop through the -8 to 8 degree range
+    % We need to clean it up to extract that part of the data
+    % that does go from -8 to 8.
+
+    [pks, locs] = findpeaks(abs(k(:,3)));
+    k(1:(locs(2)),:) = [];
+    k((locs(3)-locs(2)):end,:) = [];
+    
+
+    % Now that the data is cleaned up we can plot the data 
+    % First we need to divide each lateral force data point by its
+    % corresponding normal force. Then we fit a curve to this data.
+
+    x1 = -0.8:0.08:0.8;
+    x2 = k(:,3);        %Dont really need an extra variable but meh...
+    x3 = unique(x2);    %Get rid of repetitions
+    
+    long_force = k(:,6); 
+    norm_force = k(:,8);
+    
+    %If there are repetitions find the intersection between x2 and x3 and tell 
+    %me which data points these are.
+                                
+    [diff, index] = intersect(x2, x3, 'rows'); 
+    
+    %Fit the spline
+
+    pc = spline(x3, long_force./abs(norm_force), x1);
+    
+    %Find the peaks and their indices in the array. Put these into an array
+    %of Kl values
+    
+    [pks2, locs2] =max(abs(pc));
+    klArray = cat(2, klArray, pks2(1)); 
+    
+    %Plot these values 
+  
+    plot(x2, long_force) 
+    axis([-80 80 -1000 3000])
+    if (i ~= 12)
+       hold on
+    end 
+    
+    % Dont worry about this for now 
+    
+    if (i == 1 || i == 5 || i == 9)
+        ind = cat(2, ind, klArray(i))
+    end
+    
+end 
+%% Finding K (Coefficient of Rolling Friction)
+klArray = []
+average = []
+ind = []
+for i = 1:12
+    k = cell2mat(D(i));
+    
+    % Data doesnt come in one swoop through the -8 to 8 degree range
+    % We need to clean it up to extract that part of the data
+    % that does go from -8 to 8.
+
+    [pks, locs] = findpeaks(abs(k(:,2)));
+    k(1:(locs(1)),:) = [];
+    k((locs(2)-locs(1)):end,:) = [];
+    
+
+    % Now that the data is cleaned up we can plot the data 
+    % First we need to divide each lateral force data point by its
+    % corresponding normal force. Then we fit a curve to this data.
+
+    x1 = -4:0.08:4;
+    x2 = k(:,2);        %Dont really need an extra variable but meh...
+    x3 = unique(x2);    %Get rid of repetitions
+    
+    lat_force = k(:,6); 
+    norm_force = k(:,8);
+    
+    %If there are repetitions find the intersection between x2 and x3 and tell 
+    %me which data points these are.
+                                
+    [diff, index] = intersect(x2, x3, 'rows'); 
+    
+    %Fit the spline
+
+    pc = spline(x3, lat_force(index)./abs(norm_force(index)), x1);
+    
+    %Find the values at zero angle.
+    
+    for r = 1:length(x1)
+        if x1(r) == 0
+            index = r
+        end 
+    end
+    
+    klArray = cat(2, klArray, lat_force(index)./abs(norm_force(index)))
+    
+    if (i ~= 12)
+       hold on
+    end 
+    
+    % Dont worry about this for now 
+    
+    if (i == 1 || i == 5 || i == 9)
+        ind = cat(2, ind, klArray(i))
+    end
+    
+end
